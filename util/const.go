@@ -1,0 +1,3 @@
+package util
+
+const PROTOCOL_PASSCODE = 1503221818
