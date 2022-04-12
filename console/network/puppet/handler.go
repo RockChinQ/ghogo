@@ -3,7 +3,7 @@ package puppet
 import (
 	"encoding/json"
 	"ghogo/console/config/kernel"
-	"ghogo/console/netio"
+	"ghogo/util/puppet"
 	"net"
 	"strconv"
 	"sync"
@@ -19,19 +19,11 @@ var Handlers = make(map[int32]*PuppetHandler)
 var HandlersLock sync.Mutex
 
 type PuppetHandler struct {
-	UID        int32                 //UID of a puppet connection
-	IO         netio.PackageIO       //IO manager
-	Status     int                   //status of this handler
-	Name       string                //Name for human to read
-	Profile    map[string]string     //profile of this handler
-	SubProcess map[string]SubProcess //subprocesses
-}
-
-type SubProcess struct {
-	UUID            string `json:"uuid"`
-	Buffer          string `json:"buffer"`
-	CreateTimeStamp int64  `json:"create-time-stamp"`
-	Command         string `json:"command"`
+	util.Handler
+	UID        int32                        //UID of a puppet connection
+	Name       string                       //Name for human to read
+	Profile    map[string]string            //profile of this handler
+	SubProcess map[string]puppet.SubProcess //subprocesses
 }
 
 /*
@@ -55,16 +47,18 @@ const (
 //Wrap a new handler
 func newPuppetHandler(c net.Conn) {
 
-	pio := netio.PackageIO{
+	pio := util.PackageIO{
 		Connection: c,
 	}
 	handler := &PuppetHandler{
-		UIDIndex,
-		pio,
-		STATUS_ESTABLISHED,
-		"Unknown",
-		make(map[string]string),
-		make(map[string]SubProcess),
+		Handler: util.Handler{
+			IO:     pio,
+			Status: STATUS_ESTABLISHED,
+		},
+		UID:        UIDIndex,
+		Name:       "Unknown",
+		Profile:    make(map[string]string),
+		SubProcess: make(map[string]puppet.SubProcess),
 	}
 	HandlersLock.Lock()
 	Handlers[UIDIndex] = handler
@@ -97,7 +91,7 @@ func (ph *PuppetHandler) Handle() {
 	}
 	//passcode正确
 	for {
-		pack := &netio.NetPackage{}
+		pack := &util.NetPackage{}
 		err = ph.IO.ReadJSON(pack)
 		if err != nil {
 			ph.Disconnect("read net package failed:" + err.Error())
@@ -113,15 +107,19 @@ func (ph *PuppetHandler) Handle() {
 			return
 		}
 
+		logrus.WithFields(logrus.Fields{
+			"location": "netio/puppet/handler.go",
+		}).Debug("Recv: " + pack.Payload)
+
 		//payload type
-		var payload IPayload
+		var payload IConsolePayload
 		switch pack.Type {
 		case "PAYLOAD_LOGIN":
-			payload = &PayloadLogin{}
+			payload = &ConsolePayloadLogin{}
 		case "PAYLOAD_SUB_PROCESS":
-			payload = &PayloadSubProcess{}
+			payload = &ConsolePayloadSubProcess{}
 		case "PAYLOAD_SUB_PROCESS_OUT":
-			payload = &PayloadSubProcessOut{}
+			payload = &ConsolePayloadSubProcessOut{}
 		}
 
 		err = json.Unmarshal([]byte(pack.Payload), payload)
@@ -144,5 +142,5 @@ func (ph *PuppetHandler) Disconnect(reason string) {
 	logrus.WithFields(logrus.Fields{
 		"location": "netio/puppet/handler.go",
 		"puppet":   ph.Name + "," + strconv.FormatInt(int64(ph.UID), 10),
-	}).Info("Puppet disconnected:" + reason)
+	}).Trace("Puppet disconnected:" + reason)
 }

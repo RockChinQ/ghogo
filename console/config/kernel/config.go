@@ -12,11 +12,11 @@ var cfg *KernelConfig
 
 //Config of console main runtime
 type KernelConfig struct {
-	RuntimeMode   int       `json:"runtime-mode"`
-	LogLevel      log.Level `json:"log-level"`
-	SocketAddress string    `json:"socket-address"`
-	SocketPort    int       `json:"socket-port"`
-	PuppetTimeOut int       `json:"puppet-time-out"`
+	RuntimeMode   int    `json:"runtime-mode"`
+	LogLevel      string `json:"log-level"`
+	SocketAddress string `json:"socket-address"`
+	SocketPort    int    `json:"socket-port"`
+	PuppetTimeOut int    `json:"puppet-time-out"`
 }
 
 //Initialize cfg from a json
@@ -45,7 +45,7 @@ func init() {
 func ResetKernelConfig() {
 	cfg = &KernelConfig{
 		RUNTIME_MODE_NORMAL,
-		LOG_LEVEL_INFO,
+		"debug",
 		"",
 		1133,
 		10000,
@@ -53,7 +53,24 @@ func ResetKernelConfig() {
 }
 
 func ApplyGlobalConfig() {
-	log.SetLevel(cfg.LogLevel)
+	switch cfg.LogLevel {
+	case "trace":
+		log.SetLevel(LOG_LEVEL_TRACE)
+	case "debug":
+		log.SetLevel(LOG_LEVEL_DEBUG)
+	case "info":
+		log.SetLevel(LOG_LEVEL_INFO)
+	case "warn":
+		log.SetLevel(LOG_LEVEL_WARN)
+	case "error":
+		log.SetLevel(LOG_LEVEL_ERROR)
+	case "fatal":
+		log.SetLevel(LOG_LEVEL_FATAL)
+	case "panic":
+		log.SetLevel(LOG_LEVEL_PANIC)
+	default:
+		log.SetLevel(LOG_LEVEL_INFO)
+	}
 }
 
 func GetInst() *KernelConfig {

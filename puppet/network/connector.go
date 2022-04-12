@@ -1,7 +1,8 @@
-package netio
+package network
 
 import (
 	"ghogo/puppet/config"
+	"ghogo/util"
 	"net"
 	"strconv"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var handler *Handler
+var HandlerInst *ConsoleHandler
 
 var currentID = 0
 
@@ -26,19 +27,23 @@ func Connect() {
 			continue
 		}
 
-		handler = &Handler{
-			PackageIO{
-				Connection: conn,
+		HandlerInst = &ConsoleHandler{
+			Handler: util.Handler{
+				IO: util.PackageIO{
+					Connection: conn,
+				},
+				Status: STATUS_ESTABLISHED,
 			},
-			STATUS_ESTABLISHED,
 		}
 
 		logrus.WithFields(logrus.Fields{
 			"location": "netio/connector.go",
 		}).Info("Successfully connected to: " + config.GetInst().ConsoleAddress + ":" + strconv.Itoa(config.GetInst().ConsolePort))
 
-		go handler.CheckLoginTimeOut(currentID)
-		go handler.Handle()
+		//检查是否登录超时
+		go HandlerInst.CheckLoginTimeOut(currentID)
+
+		go HandlerInst.Handle()
 		break
 	}
 }

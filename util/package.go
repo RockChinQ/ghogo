@@ -1,14 +1,19 @@
-package netio
+package util
 
 import (
 	"encoding/binary"
 	"encoding/json"
 	"net"
+	"sync"
 	"time"
 )
 
 type PackageIO struct {
 	Connection net.Conn
+
+	Pending         []NetPackage
+	PendingMutex    *sync.Mutex
+	SenderWaitGroup sync.WaitGroup
 }
 
 type NetPackage struct {
@@ -66,11 +71,66 @@ func (pio *PackageIO) WriteNetPackage(pkgType string, payload interface{}) error
 	}
 	np := NetPackage{
 		pkgType,
-		int64(time.Now().Unix()) * 1000,
+		int64(time.Now().Unix()),
 		string(bytes),
 	}
 
 	return pio.WriteJSON(np)
+}
+
+func (pio *PackageIO) makeSureReady() {
+	if pio.Pending == nil {
+		pio.Pending = make([]NetPackage, 0)
+		var mutex sync.Mutex
+		pio.PendingMutex = &mutex
+		go pio.sender()
+	}
+}
+
+//Provides a async way to write package
+func (pio *PackageIO) AppendNetPackage(pkgType string, payload interface{}) error {
+
+	bytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	np := NetPackage{
+		pkgType,
+		int64(time.Now().Unix()),
+		string(bytes),
+	}
+
+	pio.Pending = append(pio.Pending, np)
+	pio.FlushAsync()
+	return nil
+}
+
+func (pio *PackageIO) FlushAsync() {
+	pio.SenderWaitGroup.Done()
+}
+
+func (pio *PackageIO) sender() {
+	for true {
+		pio.PendingMutex.Lock()
+		if len(pio.Pending) > 0 { //if there are,send
+
+			nps := pio.Pending[0]
+			pio.Pending = pio.Pending[1:]
+
+			pio.PendingMutex.Unlock()
+
+			//send
+			_ = pio.WriteJSON(nps) //this error may not be process
+
+			continue
+		} else { //no pending pkg,wait
+			pio.PendingMutex.Unlock()
+
+			pio.SenderWaitGroup.Add(1)
+			pio.SenderWaitGroup.Wait()
+		}
+
+	}
 }
 
 func (pio *PackageIO) Disconnect() error {

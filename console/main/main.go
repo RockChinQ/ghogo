@@ -4,12 +4,14 @@ package main
 import (
 	"flag"
 	"ghogo/console/config/kernel"
-	"ghogo/console/netio/puppet"
+	"ghogo/console/network/puppet"
+	"ghogo/console/shell/vterm"
 	"ghogo/util"
 	"io/ioutil"
 	"os"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,6 +20,9 @@ var configFilePath string
 var wg sync.WaitGroup
 
 func main() {
+
+	logrus.AddHook(&GeneralLogHook{})
+
 	flag.StringVar(&configFilePath, "c", "kernel.json", "specific config file,load(if exist)/generate(if not exist)")
 
 	flag.Parse()
@@ -39,6 +44,7 @@ func main() {
 
 			error = kernel.LoadKernelConfig(string(bytes))
 			if error == nil {
+				kernel.ApplyGlobalConfig()
 				log.WithFields(log.Fields{
 					"location":  "main/main.go",
 					"file":      configFilePath,
@@ -79,6 +85,10 @@ func main() {
 	flag.IntVar(&kernel.GetInst().RuntimeMode, "mode", kernel.GetInst().RuntimeMode, "runtime mode:0(Debug) 1(Normal)")
 	flag.Parse()
 
+	log.WithFields(log.Fields{
+		"location": "main/main.go",
+	}).Info("Log level:", log.GetLevel())
+
 	//Make service
 
 	error := puppet.InitializePuppetAcceptor()
@@ -89,6 +99,9 @@ func main() {
 	} else {
 		go puppet.GetAcceptorInst().Accept()
 	}
+
+	//launch vterm
+	go vterm.LaunchVterm(VtermEvent)
 
 	wg.Add(1)
 	wg.Wait()

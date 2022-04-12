@@ -44,7 +44,7 @@ func ResetContext() {
 	ctx = &Context{
 		"alpha2022031700",
 		runtime.GOOS,
-		int64(time.Now().Unix()) * 1000,
+		time.Now().Unix(),
 		cfg.InstallTimeStamp,
 		uuid.NewString(), //process
 		cfg.Directory,

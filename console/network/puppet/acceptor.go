@@ -41,7 +41,7 @@ func (pa *PuppetAcceptor) Accept() {
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"location": "net/puppet/acceptor.go",
-			}).Error("Failed to accept connection.", err)
+			}).Panic("Failed to accept connection.", err)
 			break
 		}
 		newPuppetHandler(c)
