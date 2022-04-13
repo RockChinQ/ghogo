@@ -27,7 +27,10 @@ func (h *GeneralLogHook) Fire(entry *logrus.Entry) error {
 	logBuffer = append(logBuffer, entry)
 	if vterm.Screen != nil {
 
-		Repaint(vterm.Screen)
+		if display == DISPLAY_LOG {
+
+			Repaint(vterm.Screen)
+		}
 	}
 	return nil
 }

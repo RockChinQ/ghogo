@@ -45,10 +45,13 @@ func LaunchVterm(hook func(tcell.Event, tcell.Screen)) {
 	}
 }
 
-func DrawText(x1, y1, x2, y2 int, style tcell.Style, text string) {
+func DrawText(x1, y1, x2, y2 int, style tcell.Style, text []rune, trace bool) {
 	row := y1
 	col := x1
-	for _, r := range []rune(text) {
+	for _, r := range text {
+		if trace {
+			logrus.Trace("SetContent:", string(r), r)
+		}
 		Screen.SetContent(col, row, r, nil, style)
 		col++
 		if col >= x2 {
