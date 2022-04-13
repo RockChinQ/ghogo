@@ -11,7 +11,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,7 +20,7 @@ var wg sync.WaitGroup
 
 func main() {
 
-	logrus.AddHook(&GeneralLogHook{})
+	log.AddHook(&GeneralLogHook{})
 
 	flag.StringVar(&configFilePath, "c", "kernel.json", "specific config file,load(if exist)/generate(if not exist)")
 

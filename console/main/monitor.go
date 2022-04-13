@@ -3,6 +3,7 @@ package main
 import (
 	"ghogo/console/shell/vterm"
 	"ghogo/util"
+	"ghogo/util/puppet"
 	"os"
 	"strconv"
 
@@ -17,6 +18,12 @@ const (
 
 var display = DISPLAY_LOG
 var width, height int
+
+var prompt = "console"
+
+var cursorX = 0
+
+var buffer = ""
 
 const (
 	PLAIN_DOWN_RIGHT         = "┌"
@@ -39,6 +46,10 @@ var STYLE_WARN = tcell.StyleDefault.Background(tcell.ColorYellow)
 var STYLE_ERROR = tcell.StyleDefault.Background(tcell.ColorRed)
 var STYLE_PANIC = tcell.StyleDefault.Background(tcell.ColorDarkRed)
 var STYLE_FATAL = tcell.StyleDefault.Background(tcell.ColorLightGray)
+
+var STYLE_PROMPT = tcell.StyleDefault.Background(tcell.ColorLightGreen)
+
+var STYLE_CURSOR = tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorBlack)
 
 func VtermEvent(ev tcell.Event, s tcell.Screen) {
 
@@ -64,8 +75,24 @@ func VtermEvent(ev tcell.Event, s tcell.Screen) {
 
 			mod, key, ch := ev.Modifiers(), ev.Key(), ev.Rune()
 
-			vterm.DrawText(0, 0, 20, 10, tcell.StyleDefault, "                                       ")
-			vterm.DrawText(0, 0, 20, 10, tcell.StyleDefault, "mod:"+strconv.FormatInt(int64(mod), 10)+" key:"+strconv.FormatInt(int64(key), 10)+" ch:"+string(ch))
+			vterm.DrawText(32, 0, 55, 0, tcell.StyleDefault, "                                       ")
+			vterm.DrawText(32, 0, 55, 0, tcell.StyleDefault, " mod:"+strconv.FormatInt(int64(mod), 10)+" key:"+strconv.FormatInt(int64(key), 10)+" ch:"+string(ch)+"|")
+
+			if display == DISPLAY_TERMINAL {
+
+				if key == 256 { //insert symbol
+					InsertBuffer(s, ch)
+				} else if mod == 0 && key == 8 { //backspace
+					Backspace(s)
+				} else if mod == 0 && key == 13 { //enter
+					buffer = ""
+				} else if mod == 0 && key == 260 { //left
+					MoveCursor(s, -1)
+				} else if mod == 0 && key == 259 { //right
+					MoveCursor(s, 1)
+				}
+				RepaintBuffer(s)
+			}
 		}
 	}
 }
@@ -78,7 +105,7 @@ func Repaint(s tcell.Screen) {
 	vterm.DrawText(width-3, 0, width, 0, tcell.StyleDefault, strconv.Itoa(len(logBuffer)))
 	if display == DISPLAY_TERMINAL {
 		vterm.DrawText(0, 0, 35, 0, tcell.StyleDefault, "| >V[T]erminal |  System [L]og |")
-
+		RepaintVTerminalPanel(s)
 	} else {
 		vterm.DrawText(0, 0, 35, 0, tcell.StyleDefault, "|  V[T]erminal | >System [L]og |")
 		RepaintLogWaterfall(s)
@@ -125,5 +152,70 @@ func RepaintLogWaterfall(s tcell.Screen) {
 		vterm.DrawText(20, y, 26, y, style, entry.Level.String())
 		vterm.DrawText(26, y, width, y, STYLE_RESET, entry.Message)
 		idx--
+	}
+}
+
+//current focused subprocess,any input through vterm will be redirected to this
+var focusedSubprocess puppet.SubProcess
+
+func RepaintVTerminalPanel(s tcell.Screen) {
+	RepaintBuffer(s)
+}
+
+func RepaintBuffer(s tcell.Screen) {
+
+	for i := 0; i < width; i++ {
+		vterm.DrawText(i, height-1, width, height-1, tcell.StyleDefault, " ")
+	}
+
+	//put prompt
+	vterm.DrawText(0, height-1, len(prompt)+6, height-1, STYLE_PROMPT, "GHO "+prompt+" >")
+
+	//buffer
+	vterm.DrawText(len(prompt)+6+1, height-1, width, height-1, tcell.StyleDefault, buffer)
+
+	//cursor
+	DrawCursor(s)
+
+	s.Sync()
+}
+
+func MoveCursor(s tcell.Screen, delta int) {
+	if delta == -1 && cursorX > 0 {
+		cursorX -= 1
+	} else if delta == 1 && cursorX < len(buffer) {
+		cursorX += 1
+	}
+}
+
+func InsertBuffer(s tcell.Screen, ch rune) {
+	buffer = buffer[:cursorX] + string(ch) + buffer[cursorX:]
+	cursorX += 1
+
+	//绘制insert位置之后的所有字符
+	vterm.DrawText(len(prompt)+6+cursorX, height-1, len(prompt)+6+len(buffer), height-1, tcell.StyleDefault, string(ch)+buffer[cursorX:])
+
+	s.Sync()
+}
+
+func Backspace(s tcell.Screen) {
+	if cursorX != 0 {
+		//delete end
+		vterm.DrawText(len(prompt)+6+len(buffer)-1, height-1, len(prompt)+6+len(buffer)-1, height-1, tcell.StyleDefault, " ")
+
+		buffer = buffer[:cursorX-1] + buffer[cursorX:]
+
+		//draw text after cursor
+		cursorX--
+
+	}
+
+}
+
+func DrawCursor(s tcell.Screen) {
+	if cursorX >= len(buffer) {
+		vterm.DrawText(len(prompt)+7+len(buffer), height-1, len(prompt)+7+len(buffer), height-1, STYLE_CURSOR, " ")
+	} else {
+		vterm.DrawText(len(prompt)+7+cursorX, height-1, len(prompt)+7+cursorX, height-1, STYLE_CURSOR, buffer[cursorX:cursorX+1])
 	}
 }
